@@ -2,10 +2,13 @@ from marshmallow import Schema, fields, validate, validates, ValidationError
 from app.models.user import User
 
 
-# class UserSchema(Schema):
-#     id = fields.Int(dump_only=True)
-#     username = fields.Str()
-#     email = fields.Email()
+class UserSchema(Schema):
+    id = fields.Int(dump_only=True)
+    username = fields.Str()
+    email = fields.Email()
+    is_admin = fields.Bool()
+    is_superadmin = fields.Bool()
+
 
 # Schema za registraciju korisnika
 class UserCreateSchema(Schema):
@@ -23,9 +26,8 @@ class UserCreateSchema(Schema):
 
 # Schema za serilizaciju (response)
 class UserRegisterResponseSchema(Schema):
-    id = fields.Int(dump_only=True)
-    is_admin = fields.Bool(required=True)
     message = fields.Str(required=True)
+    user = fields.Nested(UserSchema, required=True)
 
 
 # Schema za promenu statusa korisnika
@@ -58,20 +60,17 @@ class UserLoginSchema(Schema):
 # Schema za odgovor klijentu nakon uspesne prijave
 class UserLoginResponseSchema(Schema):
     access_token = fields.Str(required=True)
-    is_admin = fields.Bool(required=True)
-    username = fields.Str(required=True)
-
-
-class UserSchema(Schema):
-    id = fields.Int(dump_only=True)
-    username = fields.Str()
-    email = fields.Email()
-    is_admin = fields.Bool()
+    message = fields.Str(required=True)
+    user = fields.Nested(UserSchema, required=True)
 
 
 # Schema za ulazne podatke za rutu koja vraca podatke iz pojedinacnog naloga (login parametar)
 class UserLookupSchema(Schema):
     login = fields.Str(required=True, validate=validate.Length(min=3, max=80))
+
+
+class UserDeleteResponseSchema(Schema):
+    message = fields.Str(required=True)
 
 
 # Schema za ulazne podatke za rutu koja azurira podatke

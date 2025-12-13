@@ -6,19 +6,19 @@ from app.extensions import db
 from app.models.user import User
 from app.schemas.user_schema import (UserCreateSchema, AdminStatusSchema, UserRegisterResponseSchema, UserLoginSchema,
                                      UserLoginResponseSchema, UserSchema, UserUpdateSchema, UserUpdateResponseSchema,
-                                     )
+                                     UserDeleteResponseSchema)
 from werkzeug.security import generate_password_hash, check_password_hash
 
 blp = Blueprint("users", __name__, url_prefix="/users")
 
 
 # Dekorator koji proverava da li korisnik ima privilegiju admina
-def admin_required(fn):
+def super_admin_required(fn):
     @jwt_required()
     def wrapper(*args, **kwargs):
         current_user_id = get_jwt_identity()
         user = User.query.get(current_user_id)
-        if not user or not user.is_admin:
+        if not user or not user.is_superadmin:
             abort(403, message="Admin rights required.")
         return fn(*args, **kwargs)
 
@@ -29,7 +29,7 @@ def admin_required(fn):
 @blp.route("/<int:user_id>/make_admin")
 class AdminStatus(MethodView):
 
-    @admin_required
+    @super_admin_required
     @blp.arguments(AdminStatusSchema)
     def patch(self, data, user_id):
         """
@@ -83,13 +83,15 @@ class UserRegister(MethodView):
         ).first():
             return {"message": "Korisnik sa tim username-om ili email-om već postoji."}, 400
 
-        is_admin_value = User.query.count() == 0
+        # Ako je prvi korisnik → superadmin
+        is_first_user = User.query.count() == 0
 
         new_user = User(
             username=user_data["username"],
             email=user_data["email"],
             password_hash=generate_password_hash(user_data["password"]),
-            is_admin=is_admin_value
+            is_admin=is_first_user,
+            is_superadmin=is_first_user
         )
 
         db.session.add(new_user)
@@ -97,8 +99,7 @@ class UserRegister(MethodView):
 
         return {
             "message": f"Korisnik {new_user.username} je uspešno registrovan.",
-            "id": new_user.id,
-            "is_admin": new_user.is_admin
+            "user": new_user
         }, 201
 
 
@@ -131,7 +132,8 @@ class UserLogin(MethodView):
 
         return {
             "message": f"Uspešna prijava. Dobrodošao {user.username}.",
-            "access_token": token
+            "access_token": token,
+            "user": user
         }, 200
 
 
@@ -244,6 +246,7 @@ class UserLookup(MethodView):
 class UserDelete(MethodView):
 
     @jwt_required()
+    @blp.response(200, UserDeleteResponseSchema)
     def delete(self, user_id):
         """
         Brisanje korisničkog naloga.
