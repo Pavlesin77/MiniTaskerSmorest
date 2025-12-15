@@ -27,3 +27,4 @@ instance/
 
 # Internal test files
 test.py
+app/config.py

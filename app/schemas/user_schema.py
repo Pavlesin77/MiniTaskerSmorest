@@ -69,6 +69,11 @@ class UserLookupSchema(Schema):
     login = fields.Str(required=True, validate=validate.Length(min=3, max=80))
 
 
+class UserLookupResponseSchema(Schema):
+    message = fields.Str(required=True)
+    user = fields.Nested(UserSchema, required=True)
+
+
 class UserDeleteResponseSchema(Schema):
     message = fields.Str(required=True)
 
@@ -84,16 +89,6 @@ class UserUpdateSchema(Schema):
         required=False,
         metadata={"description": "Nova email adresa korisnika"}
     )
-
-    @validates("username")
-    def validate_unique_username(self, value, **kwargs):
-        if User.query.filter_by(username=value).first():
-            raise ValidationError("Username je već zauzet.")
-
-    @validates("email")
-    def validate_unique_email(self, value, **kwargs):
-        if User.query.filter_by(email=value).first():
-            raise ValidationError("Email je već zauzet.")
 
 
 # Schema koja serijalizuje odgovor servera nakon azuriranja podataka

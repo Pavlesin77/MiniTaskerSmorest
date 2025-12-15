@@ -6,7 +6,7 @@ from app.extensions import db
 from app.models.user import User
 from app.schemas.user_schema import (UserCreateSchema, AdminStatusSchema, UserRegisterResponseSchema, UserLoginSchema,
                                      UserLoginResponseSchema, UserSchema, UserUpdateSchema, UserUpdateResponseSchema,
-                                     UserDeleteResponseSchema)
+                                     UserDeleteResponseSchema, UserLookupSchema, UserLookupResponseSchema)
 from werkzeug.security import generate_password_hash, check_password_hash
 
 blp = Blueprint("users", __name__, url_prefix="/users")
@@ -176,30 +176,23 @@ class UserSelf(MethodView):
 class UserLookup(MethodView):
 
     @jwt_required()
-    @blp.response(200, UserSchema)
-    def get(self):
-        # 1. Dobavljanje prijavljenog korisnika
+    @blp.arguments(UserLookupSchema, location="query")  # ubacujemo schemu za query parametar
+    @blp.response(200, UserLookupResponseSchema)
+    def get(self, args):
+        # args["login"] sadrži username ili email korisnika kojeg admin želi da preuzme
+        login_value = args["login"]
+
+        # Dobavljanje prijavljenog korisnika
         user_id = get_jwt_identity()
         current_user = User.query.get(user_id)
         if not current_user:
             abort(401, message="Prijavljeni korisnik nije pronađen.")
 
-        # 2. Čitanje query parametra
-        login_value = request.args.get("login")
-        if not login_value:
-            abort(400, message="login query parameter is required.")
+        # Provera pristupa
+        if not current_user.is_admin:
+            abort(403, message="Pristup dozvoljen samo administratoru.")
 
-        # 3. Provera pristupa
-        allowed = (
-                current_user.is_admin or
-                login_value == current_user.username or
-                login_value == current_user.email
-        )
-
-        if not allowed:
-            abort(403, message="Pristup dozvoljen samo vlasniku naloga ili administratoru.")
-
-        # 4. Pretraga korisnika
+        # Pretraga korisnika
         user = User.query.filter(
             (User.username == login_value) | (User.email == login_value)
         ).first()
@@ -207,7 +200,10 @@ class UserLookup(MethodView):
         if not user:
             abort(404, message="Korisnik nije pronađen.")
 
-        return user
+        return {
+            "message": f"Nalog korisnika {user.username}:",
+            "user": user
+        }
 
 
 # @blp.route("/lookup")
@@ -285,11 +281,18 @@ class UserUpdate(MethodView):
         user_id = get_jwt_identity()
         user = User.query.get_or_404(user_id)
 
-        # Ažuriranje polja samo ako su poslata
+        # Provera jedinstvenosti username-a
         if "username" in update_data:
+            existing = User.query.filter_by(username=update_data["username"]).first()
+            if existing and existing.id != user.id:
+                abort(400, message="Username je već zauzet.")
             user.username = update_data["username"]
 
+        # Provera jedinstvenosti email-a
         if "email" in update_data:
+            existing = User.query.filter_by(email=update_data["email"]).first()
+            if existing and existing.id != user.id:
+                abort(400, message="Email je već zauzet.")
             user.email = update_data["email"]
 
         db.session.commit()
