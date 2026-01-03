@@ -8,6 +8,8 @@ class UserSchema(Schema):
     email = fields.Email()
     is_admin = fields.Bool()
     is_superadmin = fields.Bool()
+    created_at = fields.DateTime(dump_only=True)  # novo polje
+    updated_at = fields.DateTime(dump_only=True)  # novo polje
 
 
 # Schema za registraciju korisnika
@@ -96,6 +98,22 @@ class UserUpdateResponseSchema(Schema):
     message = fields.Str()
     user = fields.Nested(UserSchema)
 
+
+# Ulazna schema za query parametre (tabela audit_logs)
+class AuditLogQuerySchema(Schema):
+    actor_user_id = fields.Int(required=False, allow_none=True)
+    target_user_id = fields.Int(required=False, allow_none=True)
+    date_from = fields.DateTime(required=False, allow_none=True)
+    date_to = fields.DateTime(required=False, allow_none=True)
+
+
+# Response schema za rutu koja vraća audit log zapise superadminu
+class AuditLogResponseSchema(Schema):
+    id = fields.Int(dump_only=True)
+    actor_user_id = fields.Int(allow_none=True)
+    target_user_id = fields.Int(allow_none=True)
+    action = fields.Str()
+    created_at = fields.DateTime()
 
 # class UserSchema(Schema):
 #     id = fields.Int(dump_only=True)
